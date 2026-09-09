@@ -1,0 +1,203 @@
+```yaml
+# ============================================================
+# Azure DevOps Pipeline - Playwright Automation
+# ============================================================
+
+trigger:
+  branches:
+    include:
+      - main
+
+# Scheduled execution
+schedules:
+  - cron: "0 6 * * 1-5"
+    displayName: "Weekday Regression - 6:00 AM"
+    branches:
+      include:
+        - main
+    always: true
+
+# Allow manual execution from Azure DevOps
+pr: none
+
+variables:
+  nodeVersion: "20.x"
+  testEnvironment: "QA"
+
+  # Change these according to your project
+  testCommand: "npx playwright test"
+
+  # Email recipients
+  emailRecipients: |
+    aina.otu@sterling.ng
+    emmanuel.akinloose@altbank.ng
+    temitayo.bayewu@altbank.ng
+
+pool:
+  vmImage: "ubuntu-latest"
+
+stages:
+
+  - stage: PlaywrightTests
+    displayName: "Playwright Automation Tests"
+
+    jobs:
+
+      - job: RunPlaywright
+        displayName: "Run Playwright Tests"
+
+        steps:
+
+          - checkout: self
+            displayName: "Checkout Repository"
+
+
+          - task: NodeTool@0
+            displayName: "Install Node.js"
+            inputs:
+              versionSpec: "$(nodeVersion)"
+
+          - script: |
+              node --version
+              npm --version
+            displayName: "Display Node and NPM Versions"
+
+          - script: |
+              npm ci
+            displayName: "Install NPM Dependencies"
+
+          - script: |
+              npx playwright install --with-deps
+            displayName: "Install Playwright Browsers"
+
+          - script: |
+              echo "Running Playwright tests..."
+              echo "Environment: $(testEnvironment)"
+
+              $(testCommand)
+            displayName: "Execute Playwright Tests"
+            continueOnError: true
+            env:
+              TEST_ENVIRONMENT: $(testEnvironment)
+
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish Playwright HTML Report"
+            condition: always()
+            inputs:
+              targetPath: "playwright-report"
+              artifact: "playwright-html-report"
+              publishLocation: "pipeline"
+
+          - task: PublishTestResults@2
+            displayName: "Publish Playwright Test Results"
+            condition: always()
+            inputs:
+              testResultsFormat: "JUnit"
+              testResultsFiles: "**/test-results/*.xml"
+              mergeTestResults: true
+              failTaskOnFailedTests: false
+              testRunTitle: "Playwright Automation - $(testEnvironment)"
+
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish Playwright Test Artifacts"
+            condition: always()
+            inputs:
+              targetPath: "test-results"
+              artifact: "playwright-test-results"
+              publishLocation: "pipeline"
+
+
+          - script: |
+              if [ "$AGENT_JOBSTATUS" = "Succeeded" ]; then
+                echo "##vso[task.setvariable variable=testStatus]PASSED"
+              else
+                echo "##vso[task.setvariable variable=testStatus]FAILED"
+              fi
+
+              echo "Test status: $AGENT_JOBSTATUS"
+            displayName: "Determine Test Status"
+            condition: always()
+
+  - stage: Notification
+    displayName: "Test Report Notification"
+
+    dependsOn:
+      - PlaywrightTests
+
+    condition: always()
+
+    jobs:
+
+      - job: SendEmail
+        displayName: "Send Test Report Email"
+
+        steps:
+
+          - task: DownloadPipelineArtifact@2
+            displayName: "Download Playwright Report"
+            inputs:
+              artifact: "playwright-html-report"
+              path: "$(Pipeline.Workspace)/playwright-report"
+
+          - bash: |
+
+              echo "Preparing Playwright automation email..."
+
+              if [ "$(Agent.JobStatus)" = "Succeeded" ]; then
+                STATUS="PASSED"
+              else
+                STATUS="FAILED"
+              fi
+
+              echo "Pipeline status: $STATUS"
+
+              # ------------------------------------------------
+              # Create email body
+              # ------------------------------------------------
+
+              cat > email-body.html <<EOF
+              <html>
+              <body>
+
+              <h2>Playwright Automation Test Report</h2>
+
+              <p><strong>Environment:</strong> $(testEnvironment)</p>
+              <p><strong>Pipeline:</strong> $(Build.DefinitionName)</p>
+              <p><strong>Build:</strong> $(Build.BuildNumber)</p>
+              <p><strong>Branch:</strong> $(Build.SourceBranchName)</p>
+              <p><strong>Status:</strong> $STATUS</p>
+
+              <hr>
+
+              <p>
+              The Playwright automation execution has completed.
+              </p>
+
+              <p>
+              Please access the Azure DevOps pipeline artifacts
+              to view the complete Playwright HTML report,
+              screenshots, videos and traces.
+              </p>
+
+              <hr>
+
+              <p>
+              AltBank QA Automation Team
+              </p>
+
+              </body>
+              </html>
+              EOF
+
+              echo "Email body generated."
+
+              # ------------------------------------------------
+              # SEND EMAIL HERE
+              #
+              # Integrate your approved company email service.
+              # For Microsoft 365, use Microsoft Graph API.
+              # ------------------------------------------------
+
+            displayName: "Prepare and Send Email"
+            condition: always()
+```

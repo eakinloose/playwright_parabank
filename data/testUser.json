@@ -1,0 +1,26 @@
+{
+  "validUser": {
+    "firstName": "oluwatoosinmile",
+    "lastName": "Ogunmola",
+    "street": "Marin 20 asabia close beside firstbank",
+    "city": "lagos",
+    "state": "eko",
+    "zipCode": "123456",
+    "phoneNumber": "08142939448",
+    "ssn": "1234567890",
+    "username": "tosin111",
+    "password": "password123"
+  },
+  "invalidUser": {
+    "firstName": "adeola",
+    "lastName": "Invalid@Name",
+    "street": "",
+    "city": "12345",
+    "state": "",
+    "zipCode": "invalid",
+    "phoneNumber": "123",
+    "ssn": "invalid",
+    "username": "adeolaInvalid",
+    "password": "wrongPassword"
+  }
+}
